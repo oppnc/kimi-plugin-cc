@@ -1,0 +1,23 @@
+{
+  "name": "kimi",
+  "displayName": "Kimi Code",
+  "version": "0.1.0",
+  "description": "Kimi Code subagent for Claude Code / Grok via ACP — multimodal, goals, resume, frontend-first.",
+  "author": {
+    "name": "oppnc",
+    "url": "https://github.com/oppnc"
+  },
+  "homepage": "https://github.com/oppnc/kimi-plugin-cc",
+  "repository": "https://github.com/oppnc/kimi-plugin-cc",
+  "license": "MIT",
+  "keywords": [
+    "kimi",
+    "kimi-code",
+    "acp",
+    "subagent",
+    "frontend",
+    "multimodal",
+    "claude-code",
+    "grok"
+  ]
+}

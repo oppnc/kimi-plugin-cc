@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a problem with kimi-plugin-cc
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For **security** issues, use [Security Advisories](https://github.com/oppnc/kimi-plugin-cc/security/advisories/new) instead of a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: From `package.json` / companion `--version` (e.g. 0.1.0)
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      description: Claude Code, Grok, companion-only, …
+      placeholder: Claude Code
+    validations:
+      required: true
+  - type: input
+    id: kimi
+    attributes:
+      label: Kimi Code version
+      description: Output of `kimi --version` if available
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands, slash commands, or prompts that trigger the issue
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include stderr tails or companion JSON if relevant
+    validations:
+      required: true
