@@ -17,7 +17,7 @@ Marketplace id: `kimi-code-cc` · plugin id: `kimi` → install as `kimi@kimi-co
 
 Sibling package for Codex: `kimi-plugin-codex` (different plugin format).
 
-## Version (keep in sync — all **0.1.0**)
+## Version (keep in sync — all **0.1.1**)
 
 | Location | Field |
 | --- | --- |

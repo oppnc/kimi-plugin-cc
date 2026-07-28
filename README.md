@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.1-green.svg)](./CHANGELOG.md)
 
 This plugin does one thing: call **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** as a subagent.
 
@@ -14,7 +14,7 @@ Thin ACP bridge only. No reimplemented system prompts. Tools, swarm, skills, and
 
 | | |
 | --- | --- |
-| **Version** | **0.1.0** |
+| **Version** | **0.1.1** |
 | **Hosts** | Claude Code, Grok, or other compatible hosts |
 | **Node** | ≥ 18.18 |
 | **Repository** | [github.com/oppnc/kimi-plugin-cc](https://github.com/oppnc/kimi-plugin-cc) |
@@ -52,6 +52,14 @@ Thin ACP bridge only. No reimplemented system prompts. Tools, swarm, skills, and
 ```
 
 Then run `/kimi:setup`. If the new commands are not visible in the current session, run `/reload-plugins` first.
+
+To pick up a newer release after install:
+
+```text
+/plugin marketplace update kimi-code-cc
+```
+
+Then update **kimi** from the Installed tab (or reinstall). Claude Code only refreshes plugins when the declared `version` changes.
 
 Local path (development):
 

@@ -1,7 +1,7 @@
 {
   "name": "kimi",
   "displayName": "Kimi Code",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kimi Code subagent for Claude Code / Grok via ACP — multimodal, goals, resume, frontend-first.",
   "author": {
     "name": "oppnc",

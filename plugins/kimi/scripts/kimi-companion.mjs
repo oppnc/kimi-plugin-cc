@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * kimi-companion v0.1.0 — Kimi Code over ACP for Claude Code / Grok.
+ * kimi-companion v0.1.1 — Kimi Code over ACP for Claude Code / Grok.
  */
 
 import { spawn } from "node:child_process";
@@ -38,7 +38,7 @@ import {
 import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
 const VALID_MODES = new Set(["default", "plan", "auto", "yolo"]);
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 /** Heartbeat interval for background runners (ms). */
 const BG_HEARTBEAT_MS = 10_000;
 /** running + no pid older than this → treat as orphan at reconcile (ms). */

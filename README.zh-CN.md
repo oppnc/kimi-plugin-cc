@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](./CHANGELOG.zh-CN.md)
+[![Version](https://img.shields.io/badge/version-0.1.1-green.svg)](./CHANGELOG.zh-CN.md)
 
 这个插件只做一件事：把 [Kimi Code](https://github.com/MoonshotAI/kimi-code) 作为 subagent 调用。
 
@@ -14,7 +14,7 @@ Kimi k3 的前端、多模态能力很强；放在熟悉的环境 Kimi Code 里�
 
 | | |
 | --- | --- |
-| **版本** | **0.1.0** |
+| **版本** | **0.1.1** |
 | **宿主** | Claude Code、Grok，或其它兼容工具 |
 | **Node** | ≥ 18.18 |
 | **仓库** | [github.com/oppnc/kimi-plugin-cc](https://github.com/oppnc/kimi-plugin-cc) |
@@ -52,6 +52,14 @@ Kimi k3 的前端、多模态能力很强；放在熟悉的环境 Kimi Code 里�
 ```
 
 然后跑一次 `/kimi:setup`。若当前会话还看不到新命令，先执行 `/reload-plugins`。
+
+已安装用户要拿到新版本：
+
+```text
+/plugin marketplace update kimi-code-cc
+```
+
+再在 Installed 里更新 **kimi**（或重装）。Claude Code 只有在插件声明的 `version` 变化时才会视为有更新。
 
 本地开发：
 

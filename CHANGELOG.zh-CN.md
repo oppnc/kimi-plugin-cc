@@ -4,6 +4,8 @@
 
 ## 未发布 (Unreleased)
 
+## 0.1.1
+
 ### 修复
 - 后台任务：runner PID 已死时，在 `status` / `result` / `--wait` 将假 `running` 回收为 `failed`（`orphaned`）
 - 后台 `_bg-run` 写日志到 `~/.kimi-plugin-cc/logs/`，心跳更新 `updatedAt` / 工具计数，信号与未捕获异常时 finalize

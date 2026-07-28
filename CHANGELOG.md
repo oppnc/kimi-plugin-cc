@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.1.1
+
 ### Fixed
 - Background jobs: dead runner PIDs are reconciled to `failed` (`orphaned`) on `status` / `result` / `--wait` instead of staying fake-`running` forever
 - Background `_bg-run` writes logs under `~/.kimi-plugin-cc/logs/`, heartbeats `updatedAt` / tool counts, and finalizes on signals / uncaught errors
