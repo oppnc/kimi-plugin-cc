@@ -4,6 +4,7 @@
  */
 
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import { resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -13,9 +14,16 @@ import { parseArgs, parseTaskArgs } from "./lib/args.mjs";
 import { collectGitContext } from "./lib/git-context.mjs";
 import { getHostSessionId } from "./lib/host-session.mjs";
 import { buildMediaPromptParts } from "./lib/media.mjs";
-import { binaryAvailable, killPidTree, resolveKimiBinary } from "./lib/process.mjs";
 import {
+  binaryAvailable,
+  isPidAlive,
+  killPidTree,
+  resolveKimiBinary,
+} from "./lib/process.mjs";
+import {
+  ensureDataDirs,
   generateJobId,
+  jobLogPath,
   listJobs,
   nowIso,
   readJob,
@@ -31,6 +39,10 @@ import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
 const VALID_MODES = new Set(["default", "plan", "auto", "yolo"]);
 const VERSION = "0.1.0";
+/** Heartbeat interval for background runners (ms). */
+const BG_HEARTBEAT_MS = 10_000;
+/** running + no pid older than this → treat as orphan at reconcile (ms). */
+const ORPHAN_NO_PID_GRACE_MS = 30_000;
 
 function printUsage() {
   console.log(
@@ -376,9 +388,59 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
   }
 }
 
+/**
+ * Mark running jobs whose runner PID is gone as failed (orphan).
+ * Called from status/result/wait so the UI does not lie indefinitely.
+ * @returns {number} how many jobs were reconciled
+ */
+function reconcileStaleJobs() {
+  let n = 0;
+  // Wide scan: all workspaces, up to prune bound
+  const jobs = listJobs({ limit: 100 });
+  const now = Date.now();
+  for (const job of jobs) {
+    if (job.status !== "running") {
+      continue;
+    }
+    const pid = job.pid;
+    const alive = isPidAlive(pid);
+    if (alive) {
+      continue;
+    }
+    // Allow a short grace when spawn has not written pid yet
+    if (pid == null || pid === "") {
+      const created = Date.parse(job.createdAt || "") || 0;
+      if (created && now - created < ORPHAN_NO_PID_GRACE_MS) {
+        continue;
+      }
+    }
+    writeJob({
+      ...job,
+      status: "failed",
+      updatedAt: nowIso(),
+      pid: null,
+      orphaned: true,
+      error:
+        job.error ||
+        (pid
+          ? `orphan: runner pid ${pid} is no longer alive (process exited without finalizing the job)`
+          : "orphan: runner never recorded a live pid"),
+    });
+    n += 1;
+  }
+  return n;
+}
+
+function refreshJob(jobId) {
+  reconcileStaleJobs();
+  return readJob(jobId);
+}
+
 function startBackgroundJob(jobSpec) {
+  ensureDataDirs();
   const jobId = generateJobId();
   const createdAt = nowIso();
+  const logFile = jobLogPath(jobId);
   const job = {
     id: jobId,
     status: "running",
@@ -393,26 +455,89 @@ function startBackgroundJob(jobSpec) {
     stopReason: null,
     toolEventCount: 0,
     error: null,
+    logFile,
   };
   // strip non-serializable
   delete job.asJson;
   writeJob(job);
 
   const self = fileURLToPath(import.meta.url);
+  let logFd;
+  try {
+    logFd = fs.openSync(logFile, "a");
+    fs.writeSync(
+      logFd,
+      `[${createdAt}] spawn _bg-run job=${jobId} cwd=${job.cwd}\n`,
+    );
+  } catch {
+    logFd = "ignore";
+  }
+
   const runner = spawn(process.execPath, [self, "_bg-run", jobId], {
     detached: true,
-    stdio: "ignore",
+    // Do not use stdio:"ignore" — crashes become invisible zombies.
+    stdio: logFd === "ignore" ? "ignore" : ["ignore", logFd, logFd],
     windowsHide: true,
     env: { ...process.env },
   });
+  if (typeof logFd === "number") {
+    try {
+      fs.closeSync(logFd);
+    } catch {
+      // child holds the fd
+    }
+  }
+
   job.pid = runner.pid ?? null;
+  job.updatedAt = nowIso();
   writeJob(job);
+
+  runner.on("error", (err) => {
+    const cur = readJob(jobId) || job;
+    if (cur.status === "running") {
+      writeJob({
+        ...cur,
+        status: "failed",
+        updatedAt: nowIso(),
+        pid: null,
+        error: `failed to spawn background runner: ${err?.message || err}`,
+      });
+    }
+  });
+
+  // If the runner exits before cmdBgRun finalizes (crash / hard kill path
+  // where the child never rewrote the job), mark orphan after a short delay.
+  runner.on("exit", (code, signal) => {
+    setTimeout(() => {
+      const cur = readJob(jobId);
+      if (!cur || cur.status !== "running") {
+        return;
+      }
+      // Child should have cleared pid or rewritten status; if still running
+      // and our spawn pid is gone, reconcile.
+      if (!isPidAlive(cur.pid)) {
+        writeJob({
+          ...cur,
+          status: "failed",
+          updatedAt: nowIso(),
+          pid: null,
+          orphaned: true,
+          error:
+            cur.error ||
+            `orphan: background runner exited (code=${code}, signal=${signal}) without finalizing`,
+        });
+      }
+    }, 1500);
+  });
+
   runner.unref();
 
   const payload = {
     jobId,
     status: "running",
-    message: `Kimi task started in background (${jobId}). Use status/result.`,
+    pid: job.pid,
+    logFile,
+    message: `Kimi task started in background (${jobId}). Use status/result (or --wait). Log: ${logFile}`,
   };
   if (jobSpec.asJson) {
     outputJson(payload);
@@ -421,24 +546,143 @@ function startBackgroundJob(jobSpec) {
   }
 }
 
+function appendJobLog(jobId, line) {
+  try {
+    fs.appendFileSync(jobLogPath(jobId), `[${nowIso()}] ${line}\n`, "utf8");
+  } catch {
+    // best-effort
+  }
+}
+
 async function cmdBgRun(jobId) {
-  const job = readJob(jobId);
+  ensureDataDirs();
+  let job = readJob(jobId);
   if (!job) {
     process.exit(1);
   }
+
+  // Prefer the real runner pid (this process) over the parent's spawn handle.
+  job = {
+    ...job,
+    pid: process.pid,
+    updatedAt: nowIso(),
+    logFile: job.logFile || jobLogPath(jobId),
+  };
+  writeJob(job);
+  appendJobLog(jobId, `runner start pid=${process.pid} mode=${job.mode || "yolo"}`);
+
+  let finalized = false;
+  let toolEventCount = 0;
+  let lastSessionId = job.sessionId || null;
+
+  const snapshot = () => readJob(jobId) || job;
+
+  const finalize = (patch) => {
+    if (finalized) {
+      return;
+    }
+    finalized = true;
+    if (heartbeat) {
+      clearInterval(heartbeat);
+    }
+    const cur = snapshot();
+    writeJob({
+      ...cur,
+      ...patch,
+      updatedAt: nowIso(),
+      pid: null,
+      toolEventCount:
+        patch.toolEventCount != null ? patch.toolEventCount : toolEventCount,
+    });
+    appendJobLog(
+      jobId,
+      `finalize status=${patch.status} error=${patch.error || ""} tools=${patch.toolEventCount ?? toolEventCount}`,
+    );
+  };
+
+  const heartbeat = setInterval(() => {
+    try {
+      const cur = snapshot();
+      if (cur.status !== "running") {
+        return;
+      }
+      writeJob({
+        ...cur,
+        status: "running",
+        updatedAt: nowIso(),
+        heartbeatAt: nowIso(),
+        pid: process.pid,
+        sessionId: lastSessionId || cur.sessionId || null,
+        toolEventCount,
+      });
+    } catch {
+      // ignore
+    }
+  }, BG_HEARTBEAT_MS);
+  if (typeof heartbeat.unref === "function") {
+    heartbeat.unref();
+  }
+
+  const failOrphan = (reason) => {
+    finalize({
+      status: "failed",
+      orphaned: true,
+      error: reason,
+      sessionId: lastSessionId,
+    });
+  };
+
+  // Best-effort if the process is torn down without completing the try/catch.
+  process.on("SIGTERM", () => {
+    failOrphan("runner received SIGTERM");
+    process.exit(143);
+  });
+  process.on("SIGINT", () => {
+    failOrphan("runner received SIGINT");
+    process.exit(130);
+  });
+  process.on("uncaughtException", (err) => {
+    failOrphan(`uncaughtException: ${err?.message || err}`);
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (err) => {
+    failOrphan(`unhandledRejection: ${err?.message || err}`);
+    process.exit(1);
+  });
+  process.on("exit", () => {
+    if (!finalized) {
+      // sync write only
+      try {
+        const cur = snapshot();
+        if (cur.status === "running") {
+          writeJob({
+            ...cur,
+            status: "failed",
+            updatedAt: nowIso(),
+            pid: null,
+            orphaned: true,
+            error: cur.error || "orphan: runner process exited without finalizing",
+            toolEventCount,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
+  });
+
   const kimiBin = resolveKimiBinary();
   if (!kimiBin) {
-    writeJob({ ...job, status: "failed", updatedAt: nowIso(), error: "kimi binary not found", pid: null });
+    finalize({ status: "failed", error: "kimi binary not found" });
     process.exit(1);
   }
 
   try {
     const media = buildMediaPromptParts(job.mediaPaths || []);
-    let gitContext = "";
     if (job.withGit) {
-      gitContext = collectGitContext(job.cwd, { base: job.base });
+      // prompt already includes git when queued; re-collect is optional noise
     }
-    // prompt already built when queued
+    appendJobLog(jobId, `acp turn begin cwd=${job.cwd}`);
     const result = await runKimiAcpTurn({
       kimiBin,
       cwd: job.cwd,
@@ -450,26 +694,32 @@ async function cmdBgRun(jobId) {
       sessionMode: job.sessionMode || "new",
       sessionId: job.sessionId || null,
       extraBlocks: media.blocks,
+      onUpdate: (update) => {
+        const kind = update?.sessionUpdate;
+        if (kind === "tool_call" || kind === "tool_call_update") {
+          toolEventCount += 1;
+        }
+        // session id is set on the client after new/load/resume; result carries it
+      },
+      onLog: (msg) => appendJobLog(jobId, `acp: ${msg}`),
     });
-    writeJob({
-      ...job,
+    lastSessionId = result.sessionId || lastSessionId;
+    toolEventCount = Math.max(toolEventCount, result.toolCalls?.length || 0);
+    finalize({
       status: "completed",
-      updatedAt: nowIso(),
       sessionId: result.sessionId,
       resultText: result.text,
       stopReason: result.stopReason,
-      toolEventCount: result.toolCalls?.length || 0,
+      toolEventCount,
       mediaNotes: media.notes,
       error: null,
-      pid: null,
+      orphaned: false,
     });
   } catch (error) {
-    writeJob({
-      ...job,
+    finalize({
       status: "failed",
-      updatedAt: nowIso(),
+      sessionId: lastSessionId,
       error: error?.message || String(error),
-      pid: null,
     });
     process.exitCode = 1;
   }
@@ -497,6 +747,7 @@ async function waitForJob(jobId, timeoutMs = null, intervalMs = 2000) {
       ? Number(timeoutMs)
       : null;
   for (;;) {
+    reconcileStaleJobs();
     const job = readJob(jobId);
     if (!job) {
       return null;
@@ -520,6 +771,8 @@ async function cmdStatus(argv) {
   const cwd = resolveWorkspaceRoot(parsed.options.cwd);
   let jobId = parsed._[0] || null;
 
+  reconcileStaleJobs();
+
   if (parsed.flags.wait) {
     jobId = resolveJobId(jobId, cwd);
     if (!jobId) {
@@ -534,14 +787,14 @@ async function cmdStatus(argv) {
     } else {
       outputText(renderJobStatus(job));
     }
-    if (!job || job.status === "failed") {
+    if (!job || job.status === "failed" || job.status === "cancelled") {
       process.exitCode = 1;
     }
     return;
   }
 
   if (jobId) {
-    const job = readJob(jobId);
+    const job = refreshJob(jobId);
     if (asJson) {
       outputJson(job);
     } else {
@@ -568,6 +821,7 @@ async function cmdResult(argv) {
   });
   const asJson = Boolean(parsed.flags.json);
   const cwd = resolveWorkspaceRoot(parsed.options.cwd);
+  reconcileStaleJobs();
   let jobId = resolveJobId(parsed._[0], cwd);
 
   if (parsed.flags.wait && jobId) {
@@ -577,7 +831,7 @@ async function cmdResult(argv) {
     await waitForJob(jobId, timeout);
   }
 
-  const job = jobId ? readJob(jobId) : null;
+  const job = jobId ? refreshJob(jobId) : null;
   if (!job) {
     if (asJson) {
       outputJson({ error: "no job" });
@@ -592,8 +846,10 @@ async function cmdResult(argv) {
   } else {
     outputText(renderJobStatus(job));
   }
-  if (job.status === "failed" || job.status === "running") {
-    process.exitCode = job.status === "failed" ? 1 : 0;
+  if (job.status === "failed" || job.status === "cancelled") {
+    process.exitCode = 1;
+  } else if (job.status === "running") {
+    process.exitCode = 0;
   }
 }
 
@@ -604,6 +860,7 @@ async function cmdCancel(argv) {
   });
   const asJson = Boolean(parsed.flags.json);
   const cwd = resolveWorkspaceRoot(parsed.options.cwd);
+  reconcileStaleJobs();
   const jobId = resolveJobId(parsed._[0], cwd);
   const job = jobId ? readJob(jobId) : null;
   if (!job) {

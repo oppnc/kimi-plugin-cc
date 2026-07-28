@@ -7,9 +7,16 @@ import path from "node:path";
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "kimi-plugin-cc-state-"));
 process.env.KIMI_PLUGIN_CC_DATA_DIR = tmpRoot;
 
-const { generateJobId, writeJob, readJob, listJobs, jobPath } = await import(
-  "../plugins/kimi/scripts/lib/state.mjs"
-);
+const {
+  generateJobId,
+  writeJob,
+  readJob,
+  listJobs,
+  jobPath,
+  getLogsDir,
+  jobLogPath,
+  ensureDataDirs,
+} = await import("../plugins/kimi/scripts/lib/state.mjs");
 
 describe("state jobs", () => {
   after(() => {
@@ -45,5 +52,13 @@ describe("state jobs", () => {
     const onlyB = listJobs({ cwd: cwdB, limit: 10 });
     assert.ok(onlyB.length >= 1);
     assert.ok(onlyB.every((j) => path.resolve(j.cwd) === path.resolve(cwdB)));
+  });
+
+  it("creates logs dir and job log path under data dir", () => {
+    ensureDataDirs();
+    assert.ok(fs.existsSync(getLogsDir()));
+    const id = generateJobId();
+    assert.ok(jobLogPath(id).includes(id));
+    assert.ok(jobLogPath(id).endsWith(".log"));
   });
 });

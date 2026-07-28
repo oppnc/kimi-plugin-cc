@@ -22,7 +22,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task [options] -- "<user
 | `--resume` / `--session id` | Continue prior ACP session |
 | `--fresh` | Force new session |
 | `--git` / `--base ref` | Attach raw git context |
-| `--background` | Detached job |
+| `--background` | Detached job (prefer foreground; if used, poll `status`/`result --wait`) |
 | `--model` / `--thinking` | Catalog values from setup |
 
 ## Rules

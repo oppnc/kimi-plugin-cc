@@ -22,11 +22,11 @@ Selection guidance:
 Forwarding rules:
 
 - Default `--mode yolo` unless the user asked for `plan` / `auto` / `default`.
-- Prefer foreground for small tasks; `--background` for long multi-step work.
+- **Prefer foreground** (no `--background`) so the host waits for Kimi to finish. Only pass `--background` when the user explicitly asks to detach; then tell them to poll `status` / `result --wait`.
 - Preserve media flags: `--image`, `--video`, `--media` (repeatable).
 - Preserve `--resume` / `--fresh` / `--session <id>` / `--model` / `--thinking` / `--goal` / `--git`.
 - Do **not** invent system prompts or review rubrics. Forward the user's task text after stripping routing flags only.
-- Do not inspect the repo, poll status, summarize, or do independent work.
+- Do not inspect the repo, poll status, summarize, or do independent work (except when `--background` was used and the user asked you to wait — then one `status --wait` / `result --wait` is OK).
 - Return companion stdout exactly as-is. On failure, return nothing extra.
 
 Strip from natural-language text (pass as flags instead):

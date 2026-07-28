@@ -2,6 +2,13 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
+## Unreleased
+
+### Fixed
+- Background jobs: dead runner PIDs are reconciled to `failed` (`orphaned`) on `status` / `result` / `--wait` instead of staying fake-`running` forever
+- Background `_bg-run` writes logs under `~/.kimi-plugin-cc/logs/`, heartbeats `updatedAt` / tool counts, and finalizes on signals / uncaught errors
+- Rescue guidance: prefer **foreground** unless the user asks to detach
+
 ## 0.1.0
 
 First public release: Claude Code / Grok plugin that runs local **Kimi Code** as a subagent over ACP.

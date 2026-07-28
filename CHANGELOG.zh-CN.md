@@ -2,6 +2,13 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
+## 未发布 (Unreleased)
+
+### 修复
+- 后台任务：runner PID 已死时，在 `status` / `result` / `--wait` 将假 `running` 回收为 `failed`（`orphaned`）
+- 后台 `_bg-run` 写日志到 `~/.kimi-plugin-cc/logs/`，心跳更新 `updatedAt` / 工具计数，信号与未捕获异常时 finalize
+- Rescue 指导：默认前台；仅当用户要求时再 `--background`
+
 ## 0.1.0
 
 首次公开发布：在 Claude Code / Grok 中通过 ACP 将本机 **Kimi Code** 作为 subagent 调用。

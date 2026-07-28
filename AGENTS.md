@@ -129,8 +129,11 @@ There is no human answering Kimi permission prompts; the companion answers them.
 ## Jobs & host scoping
 
 - Job store: `KIMI_PLUGIN_CC_DATA_DIR` or `~/.kimi-plugin-cc`; pruned to newest ~100.
+- Background logs: `~/.kimi-plugin-cc/logs/<jobId>.log` (stdio of `_bg-run`, not `ignore`).
 - Host session binding via `CLAUDE_SESSION_ID` / `GROK_SESSION_ID` is **best-effort**; missing id → most recent job in current workspace.
 - Foreground failures are recorded as failed jobs (visible via `status` / `result`).
+- **Orphan recovery:** `status` / `result` / `--wait` call `reconcileStaleJobs()` — `running` jobs whose runner PID is dead are rewritten to `failed` with `orphaned: true` (no more infinite fake "running").
+- Background runners heartbeat `updatedAt` / `toolEventCount` every ~10s; prefer **foreground** rescue unless the user asks to detach.
 
 ## Platform notes
 

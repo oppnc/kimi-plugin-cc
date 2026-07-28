@@ -64,6 +64,21 @@ export function renderJobStatus(job) {
   if (job.stopReason) {
     lines.push(`stop      : ${job.stopReason}`);
   }
+  if (job.pid != null) {
+    lines.push(`pid       : ${job.pid}`);
+  }
+  if (job.toolEventCount != null) {
+    lines.push(`tools     : ${job.toolEventCount}`);
+  }
+  if (job.heartbeatAt) {
+    lines.push(`heartbeat : ${job.heartbeatAt}`);
+  }
+  if (job.logFile) {
+    lines.push(`log       : ${job.logFile}`);
+  }
+  if (job.orphaned) {
+    lines.push(`orphaned  : true`);
+  }
   if (job.error) {
     lines.push(`error     : ${job.error}`);
   }

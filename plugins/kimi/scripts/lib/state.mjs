@@ -16,8 +16,21 @@ export function getJobsDir() {
   return path.join(getDataDir(), "jobs");
 }
 
+export function getLogsDir() {
+  return path.join(getDataDir(), "logs");
+}
+
 export function ensureDataDirs() {
   fs.mkdirSync(getJobsDir(), { recursive: true });
+  fs.mkdirSync(getLogsDir(), { recursive: true });
+}
+
+export function jobLogPath(jobId) {
+  const safe = String(jobId).replace(/[^a-zA-Z0-9._-]/g, "");
+  if (!safe || safe !== jobId) {
+    throw new Error(`Invalid job id: ${jobId}`);
+  }
+  return path.join(getLogsDir(), `${safe}.log`);
 }
 
 export function generateJobId() {

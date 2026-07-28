@@ -154,3 +154,23 @@ export function killPidTree(pid) {
     // ignore
   }
 }
+
+/**
+ * Best-effort liveness probe (signal 0).
+ * EPERM ⇒ process exists but is not signalable by this user.
+ */
+export function isPidAlive(pid) {
+  const n = Number(pid);
+  if (!Number.isFinite(n) || n <= 0) {
+    return false;
+  }
+  try {
+    process.kill(n, 0);
+    return true;
+  } catch (error) {
+    if (error && error.code === "EPERM") {
+      return true;
+    }
+    return false;
+  }
+}
