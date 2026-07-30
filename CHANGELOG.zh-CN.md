@@ -2,7 +2,20 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
-## 未发布 (Unreleased)
+## 0.2.0
+
+公开包版本自 GitHub **0.1.x** 起记为 **0.2.0**（与 **kimi-plugin-codex** 0.2.0 锁步）。
+
+### 新增
+- 后台 job 的 **phase** + **lastProgressMessage**（queued → launching → starting_acp → running → 终态）
+- 更丰富的 status 渲染：phase、progress、resume 提示；列表 preview 50 + phase padEnd 18
+- `lib/prompt.mjs` + `tests/prompt.test.mjs`；可选 `KIMI_BRIDGE_HANDOFF=1`（默认关闭）
+
+### 变更
+- companion 核心与 **kimi-plugin-codex** 0.2.0 对齐（共享 progress / prompt 栈）
+- 加强宿主触发语气：agent/命令/skill 文案对前端/UI（含风格稿、参考页）使用 **REQUIRED / MUST / MUST NOT**；Kimi 可用时主 agent 不得自己写 UI
+- 宿主 command 薄壳与 Codex skills **功能类似**（路由表、flag、long-run 轮询、Fix 文案）
+- 版本 **0.2.0**（与 Codex 兄弟包对齐）
 
 ## 0.1.2
 

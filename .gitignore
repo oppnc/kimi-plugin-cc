@@ -36,3 +36,6 @@ coverage/
 # Claude / Grok local overrides
 .claude/settings.local.json
 .grok/
+
+# Local test sandbox (manual Kimi frontend testing)
+_behavior_sandbox/

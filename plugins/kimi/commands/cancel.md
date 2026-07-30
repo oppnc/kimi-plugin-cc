@@ -1,6 +1,6 @@
 ---
-description: Cancel a running Kimi companion background job
-argument-hint: '[job-id]'
+description: Cancel a queued or running Kimi job
+argument-hint: '[job-id] [--cwd p] [--json]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
 ---
@@ -9,4 +9,6 @@ allowed-tools: Bash(node:*)
 node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" cancel $ARGUMENTS
 ```
 
-Return stdout verbatim.
+Supported: `[job-id]`, `--cwd <path>`, `--json`.
+
+Return stdout **verbatim**. Use only when the user asks to stop a job.

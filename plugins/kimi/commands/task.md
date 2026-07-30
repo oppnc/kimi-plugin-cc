@@ -1,12 +1,17 @@
 ---
-description: Light one-shot task on local Kimi Code (prefer /kimi:rescue for frontend/UI)
-argument-hint: '[--mode yolo|plan] [--image p] [--video p] [--resume] <prompt>'
+description: >
+  Light one-shot on local Kimi Code. For ANY frontend/UI/mock/style/screenshot/video
+  or multi-file work, do NOT use this alone — MUST use Agent kimi:kimi-rescue (/kimi:rescue).
+argument-hint: '[--mode yolo|plan|auto|default] [--image p] [--video p] [--resume|--fresh] [--background] <prompt>'
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
 ---
 
-For **frontend/UI, screenshots/video, or multi-file** work, prefer Agent `kimi:kimi-rescue` (see `/kimi:rescue`).
+## Routing
 
-Otherwise forward a light one-shot:
+| Work type | Do this |
+| --- | --- |
+| Frontend / UI / mock / style / screenshot / video / multi-file | **Agent `kimi:kimi-rescue`** (or `/kimi:rescue`) — do **not** implement in the main thread |
+| Small non-UI one-shot | Companion `task` below |
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task --mode yolo $ARGUMENTS
@@ -14,4 +19,12 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task --mode yolo $ARGUME
 
 If the user already passed `--mode`, do not add another.
 
-Keep `--image` / `--video` paths when present. Return stdout verbatim.
+Supported flags (pass through when present): `--mode`, `--model`, `--thinking`, `--image` / `--video` / `--media`,
+`--cwd`, `--resume` / `--session` / `--fresh`, `--git` / `--base`, `--goal`, `--background`, `--timeout`, `--json`.
+
+## Long-running
+
+- Prefer foreground unless the user asked for background.
+- If `--background`, poll with `/kimi:status` / `/kimi:result` (or `--wait`).
+
+Keep media paths as flags. Return stdout **verbatim**.

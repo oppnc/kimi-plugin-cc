@@ -17,7 +17,10 @@ If setup fails, show the `[kimi-plugin]` error and Fix list as-is. Do not invent
 2. Terminal: `kimi login`  
 3. Optional: `KIMI_CLI_PATH` if the binary is not on PATH  
 
-If setup **ok**, tell the user the happy path for first verify:
+If setup **ok**, first verify:
 
-- Hand a small **frontend** task to Kimi: `/kimi:rescue …`  
-- Example: `/kimi:rescue Implement a small responsive settings section using existing design tokens`
+- **Frontend/UI must go to Kimi**, not the main agent: `/kimi:rescue …`  
+- Claude: `/kimi:rescue Implement a small responsive settings section using existing design tokens`  
+- Grok: spawn `subagent_type: "kimi:kimi-rescue"` (or `/kimi:rescue`) — do not write UI in the main agent  
+- CLI probe: `node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task --mode yolo -- "Reply with exactly: kimi-bridge-ok"`  
+- Long work later: `/kimi:status` / `/kimi:result`

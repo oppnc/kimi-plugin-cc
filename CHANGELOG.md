@@ -2,7 +2,20 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
-## Unreleased
+## 0.2.0
+
+Public package version continues from GitHub **0.1.x** as **0.2.0** (aligned with **kimi-plugin-codex** 0.2.0).
+
+### Added
+- Job **phase** + **lastProgressMessage** on background jobs (queued → launching → starting_acp → running → terminal)
+- Richer status render: phase, progress, resume hint; status list preview 50 + phase padEnd 18
+- `lib/prompt.mjs` + `tests/prompt.test.mjs`; optional `KIMI_BRIDGE_HANDOFF=1` bridge notes (default off)
+
+### Changed
+- Core companion alignment with **kimi-plugin-codex** 0.2.0 (shared progress / prompt stack)
+- Harder host triggers: agent/command/skill copy uses **REQUIRED / MUST / MUST NOT** for frontend/UI (including style mocks and reference pages); main agent must not implement UI when Kimi is ready
+- Host command shells **functionally similar** to Codex skills: routing tables (UI → rescue), flag lists, long-run status/result notes, setup nextSteps (Claude/Grok/CLI), Fix: `/kimi:sessions`
+- Version **0.2.0** (aligned with sibling Codex package)
 
 ## 0.1.2
 

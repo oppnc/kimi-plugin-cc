@@ -1,20 +1,30 @@
 ---
-description: Run a long-horizon Kimi Goal (verifiable objective) via ACP yolo mode
-argument-hint: '[--image <path>] [--video <path>] [--background] <objective with success criteria>'
+description: >
+  Run a long-horizon Kimi Goal via ACP yolo. Large or frontend/UI goals MUST use
+  Agent kimi:kimi-rescue (not main-agent implementation).
+argument-hint: '[--image p] [--video p] [--background] [--resume|--fresh] <objective with success criteria>'
 allowed-tools: Bash(node:*), Agent
 ---
 
-Forward a **Goal** to Kimi. Prefer the `kimi:kimi-rescue` Agent for large goals; for short goals you may call the companion directly.
+## Routing
 
-Raw arguments:
-$ARGUMENTS
+| Work type | Do this |
+| --- | --- |
+| Large goals, or any frontend/UI/visual/multi-file UI | **Agent `kimi:kimi-rescue`** with prompt starting with `--goal ` (or `/kimi:rescue` + goal intent) |
+| Short non-UI objectives | Companion `goal` below |
 
-Direct companion (small goals):
+Direct companion (small non-UI goals):
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" goal --mode yolo $ARGUMENTS
 ```
 
-Or Agent path for large work: `Agent` with `subagent_type: "kimi:kimi-rescue"` and prompt starting with `--goal `.
+Supported flags: objective after `--`, plus `--model`, `--thinking`, `--image` / `--video` / `--media`,
+`--cwd`, `--resume` / `--session` / `--fresh`, `--git` / `--base`, `--background`, `--timeout`, `--json`.
 
-Write objectives with a clear finish line and evidence (tests, build, visible UI state). Return stdout verbatim.
+## Long-running
+
+- Prefer foreground unless the user asked for background.
+- If `--background`, poll `/kimi:status` / `/kimi:result`.
+
+Write objectives with a clear finish line and evidence (tests, build, visible UI state). Return stdout **verbatim**.

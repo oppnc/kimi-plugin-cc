@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.2-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](./CHANGELOG.md)
 
 Call local **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** as a subagent from **Claude Code** or **Grok**.
 
@@ -12,7 +12,7 @@ Kimi k3 is strong at frontend and multimodal work — and stronger inside Kimi C
 
 | | |
 | --- | --- |
-| **Version** | **0.1.2** |
+| **Version** | **0.2.0** |
 | **Hosts** | Claude Code, Grok |
 | **Node** | ≥ 18.18 |
 | **Needs** | Kimi Code CLI installed + `kimi login` |
@@ -22,10 +22,10 @@ Kimi k3 is strong at frontend and multimodal work — and stronger inside Kimi C
 | Host | What to do |
 | --- | --- |
 | **Claude Code** | `/kimi:rescue <frontend or UI task>` |
-| **Grok** | Ask the main agent to hand frontend/UI work to **kimi-rescue** / Kimi companion |
-| **When** | Frontend/UI, CSS/layout, screenshot or **video** visual bugs, multi-file implement |
+| **Grok** | Main agent **must** spawn **`kimi:kimi-rescue`** (or `/kimi:rescue`) for frontend/UI — not implement UI itself |
+| **When (required)** | Frontend/UI, style mocks/reference pages, CSS/layout, screenshot or **video** visual bugs, multi-file implement |
 
-Do **not** re-implement that work in the main agent when Kimi is ready. Return Kimi’s output as-is.
+**Must not** re-implement that work in the main agent when Kimi is ready. Return Kimi’s output as-is.
 
 Advanced commands (`/kimi:task`, background jobs, status/result): see [AGENTS.md](AGENTS.md).
 
@@ -100,7 +100,7 @@ Errors are prefixed with `[kimi-plugin]` and include a numbered **Fix** list —
 
 | Component | Requirement |
 | --- | --- |
-| This plugin | 0.1.2 |
+| This plugin | 0.2.0 |
 | Node | ≥ 18.18 |
 | Kimi Code | CLI with working `kimi acp` (NDJSON). Setup prints `compat` + kimi version. Upgrade Kimi Code if ACP fails. |
 

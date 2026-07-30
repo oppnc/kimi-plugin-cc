@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.2-green.svg)](./CHANGELOG.zh-CN.md)
+[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](./CHANGELOG.zh-CN.md)
 
 在 **Claude Code** 或 **Grok** 里，把本地 **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** 当作 subagent 调用。
 
@@ -12,7 +12,7 @@ Kimi k3 前端、多模态更强；放在熟悉的 Kimi Code 环境里会更强�
 
 | | |
 | --- | --- |
-| **版本** | **0.1.2** |
+| **版本** | **0.2.0** |
 | **宿主** | Claude Code、Grok |
 | **Node** | ≥ 18.18 |
 | **依赖** | 已安装 Kimi Code CLI 并完成 `kimi login` |
@@ -22,10 +22,10 @@ Kimi k3 前端、多模态更强；放在熟悉的 Kimi Code 环境里会更强�
 | 宿主 | 怎么做 |
 | --- | --- |
 | **Claude Code** | `/kimi:rescue <前端或 UI 任务>` |
-| **Grok** | 让主 agent 把前端/UI 交给 **kimi-rescue** / Kimi companion |
-| **适用** | 前端/UI、CSS/布局、截图或 **视频** 视觉问题、多文件实现 |
+| **Grok** | 主 agent **必须** spawn **`kimi:kimi-rescue`**（或 `/kimi:rescue`）做前端/UI，**禁止**主线程自己写 UI |
+| **适用（强制）** | 前端/UI、风格稿/参考页、CSS/布局、截图或 **视频** 视觉问题、多文件实现 |
 
-Kimi 可用时，主 agent **不要**自己重做这些活；结果按原文回传。
+Kimi 可用时，主 agent **不得**自己实现这些工作；结果按原文回传。
 
 高级用法（`/kimi:task`、后台 job、status/result）见 [AGENTS.md](AGENTS.md)。
 
@@ -100,7 +100,7 @@ node plugins/kimi/scripts/kimi-companion.mjs task --mode yolo -- "Reply with exa
 
 | 组件 | 要求 |
 | --- | --- |
-| 本插件 | 0.1.2 |
+| 本插件 | 0.2.0 |
 | Node | ≥ 18.18 |
 | Kimi Code | 支持 `kimi acp` 的 CLI。setup 会打印 `compat` 与 kimi 版本；ACP 失败请升级 Kimi Code |
 

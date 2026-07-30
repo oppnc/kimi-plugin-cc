@@ -1,8 +1,8 @@
 {
   "name": "kimi",
   "displayName": "Kimi Code",
-  "version": "0.1.2",
-  "description": "Hand frontend/UI, screenshot/video bugs, and multi-file work to local Kimi Code (ACP subagent). Happy path: /kimi:rescue.",
+  "version": "0.2.0",
+  "description": "REQUIRED handoff for frontend/UI and multimodal work to local Kimi Code (ACP subagent). Main agent must not implement UI when Kimi is ready. Happy path: /kimi:rescue.",
   "author": {
     "name": "oppnc",
     "url": "https://github.com/oppnc"

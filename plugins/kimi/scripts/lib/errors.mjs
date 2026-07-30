@@ -133,7 +133,7 @@ export function resumeSessionError() {
     fixes: [
       "Omit --resume and start a new handoff",
       "Or pass --session <id> from a prior status/result",
-      "List sessions: companion sessions",
+      "List sessions: /kimi:sessions or companion sessions",
     ],
   });
 }

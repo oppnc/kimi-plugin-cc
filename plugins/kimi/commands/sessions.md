@@ -1,6 +1,6 @@
 ---
 description: List Kimi ACP sessions on disk (for --resume / --session)
-argument-hint: '[--all] [--json]'
+argument-hint: '[--all] [--cwd p] [--json]'
 disable-model-invocation: true
 allowed-tools: Bash(node:*)
 ---
@@ -9,4 +9,6 @@ allowed-tools: Bash(node:*)
 node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" sessions $ARGUMENTS
 ```
 
-Return stdout verbatim.
+Supported: `--all`, `--cwd <path>`, `--json`.
+
+Return stdout **verbatim**. Use session ids with `/kimi:task --session …` or rescue `--session` / `--resume`.
