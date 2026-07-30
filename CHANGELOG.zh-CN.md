@@ -2,7 +2,33 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
-## 未发布 (Unreleased)
+## 0.2.0
+
+公开包版本自 GitHub **0.1.x** 起记为 **0.2.0**（与 **kimi-plugin-codex** 0.2.0 锁步）。
+
+### 新增
+- 后台 job 的 **phase** + **lastProgressMessage**（queued → launching → starting_acp → running → 终态）
+- 更丰富的 status 渲染：phase、progress、resume 提示；列表 preview 50 + phase padEnd 18
+- `lib/prompt.mjs` + `tests/prompt.test.mjs`；可选 `KIMI_BRIDGE_HANDOFF=1`（默认关闭）
+
+### 变更
+- companion 核心与 **kimi-plugin-codex** 0.2.0 对齐（共享 progress / prompt 栈）
+- 加强宿主触发语气：agent/命令/skill 文案对前端/UI（含风格稿、参考页）使用 **REQUIRED / MUST / MUST NOT**；Kimi 可用时主 agent 不得自己写 UI
+- 宿主 command 薄壳与 Codex skills **功能类似**（路由表、flag、long-run 轮询、Fix 文案）
+- 版本 **0.2.0**（与 Codex 兄弟包对齐）
+
+## 0.1.2
+
+### 新增
+- README + setup 的 **首次验证**（把一个小前端任务交给 Kimi）
+- Setup doctor：Node 版本、workspace 来源、Kimi Code **compat** 软检查、可行动 `errorCode`
+- 标准化 `[kimi-plugin]` 错误与 **Fix** 列表（`lib/errors.mjs`）
+- 从宿主环境解析工作区根目录
+- 媒体路径相对 workspace 解析 + 更清晰的缺失错误
+
+### 变更
+- 用户文档只保留主路径：`/kimi:rescue`；高级细节见 AGENTS.md
+- 加强前端 / 截图 / 视频 触发描述
 
 ## 0.1.1
 

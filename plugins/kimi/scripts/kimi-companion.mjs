@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * kimi-companion v0.1.1 — Kimi Code over ACP for Claude Code / Grok.
+ * kimi-companion v0.2.0 — Kimi Code over ACP for Claude Code / Grok.
  */
 
 import { spawn } from "node:child_process";
@@ -11,6 +11,16 @@ import { fileURLToPath } from "node:url";
 
 import { KimiAcpClient, listKimiSessions, runKimiAcpTurn } from "./lib/acp-client.mjs";
 import { parseArgs, parseTaskArgs } from "./lib/args.mjs";
+import {
+  acpFailedError,
+  binaryBadError,
+  binaryNotFoundError,
+  compatNotes,
+  invalidModeError,
+  nodeTooOldError,
+  resumeSessionError,
+  taskPromptRequiredError,
+} from "./lib/errors.mjs";
 import { collectGitContext } from "./lib/git-context.mjs";
 import { getHostSessionId } from "./lib/host-session.mjs";
 import { buildMediaPromptParts } from "./lib/media.mjs";
@@ -35,14 +45,32 @@ import {
   renderStatusList,
   renderTaskResult,
 } from "./lib/render.mjs";
-import { resolveWorkspaceRoot } from "./lib/workspace.mjs";
+import { companionTaskAcceptance } from "./lib/acceptance.mjs";
+import { bridgeNotesEnabled, buildUserPrompt } from "./lib/prompt.mjs";
+import { describeWorkspaceRoot, resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
 const VALID_MODES = new Set(["default", "plan", "auto", "yolo"]);
-const VERSION = "0.1.1";
+const VERSION = "0.2.0";
+const MIN_NODE = "18.18.0";
 /** Heartbeat interval for background runners (ms). */
 const BG_HEARTBEAT_MS = 10_000;
 /** running + no pid older than this → treat as orphan at reconcile (ms). */
 const ORPHAN_NO_PID_GRACE_MS = 30_000;
+
+/**
+ * Job lifecycle phases (inspired by claude-code-agent-for-codex observability).
+ * status remains the coarse state (running|completed|failed|cancelled);
+ * phase is the finer progress label for hosts polling status.
+ */
+const PHASE = {
+  QUEUED: "queued",
+  LAUNCHING: "launching",
+  STARTING_ACP: "starting_acp",
+  RUNNING: "running",
+  COMPLETED: "completed",
+  FAILED: "failed",
+  CANCELLED: "cancelled",
+};
 
 function printUsage() {
   console.log(
@@ -69,7 +97,8 @@ function printUsage() {
       "  --goal                 frame prompt as a Kimi Goal objective",
       "  --background  --json",
       "",
-      "Env: KIMI_CLI_PATH, KIMI_PLUGIN_CC_DATA_DIR, CLAUDE_SESSION_ID / GROK_SESSION_ID",
+      "Env: KIMI_CLI_PATH, KIMI_PLUGIN_CC_DATA_DIR, CLAUDE_SESSION_ID / GROK_SESSION_ID,",
+      "     KIMI_BRIDGE_HANDOFF=1 (optional legacy host handoff bullets on task prompt)",
     ].join("\n"),
   );
 }
@@ -88,7 +117,7 @@ function normalizeMode(raw, fallback = "yolo") {
   }
   const m = String(raw).trim().toLowerCase();
   if (!VALID_MODES.has(m)) {
-    throw new Error(`Invalid --mode ${raw}. Use default|plan|auto|yolo.`);
+    throw new Error(invalidModeError(raw));
   }
   return m;
 }
@@ -96,9 +125,34 @@ function normalizeMode(raw, fallback = "yolo") {
 function requireKimiBin() {
   const kimiBin = resolveKimiBinary();
   if (!kimiBin) {
-    throw new Error("kimi binary not found. Run setup / set KIMI_CLI_PATH.");
+    throw new Error(binaryNotFoundError());
   }
   return kimiBin;
+}
+
+function nodeSemverOk(current, min = MIN_NODE) {
+  const parse = (v) =>
+    String(v)
+      .replace(/^v/i, "")
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
+  const a = parse(current);
+  const b = parse(min);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] || 0) > (b[i] || 0)) return true;
+    if ((a[i] || 0) < (b[i] || 0)) return false;
+  }
+  return true;
+}
+
+function setupNextSteps() {
+  return [
+    "REQUIRED: frontend/UI, style mocks, reference pages, screenshot/video bugs → Kimi via kimi-rescue. Main agent MUST NOT implement those when Kimi is ready.",
+    'Claude Code: /kimi:rescue Implement a small responsive settings section using existing design tokens',
+    'Grok: spawn subagent_type kimi:kimi-rescue (or /kimi:rescue) for the same frontend work — do not write UI in the main agent',
+    "Light non-UI: /kimi:task; plan: /kimi:plan; sessions: /kimi:sessions; long work: /kimi:status / /kimi:result",
+    'CLI probe: node plugins/kimi/scripts/kimi-companion.mjs task --mode yolo -- "Reply with exactly: kimi-bridge-ok"',
+  ];
 }
 
 function findResumeSessionId(cwd, explicitSession) {
@@ -119,29 +173,8 @@ function findResumeSessionId(cwd, explicitSession) {
   return candidates[0]?.sessionId || null;
 }
 
-function buildUserPrompt({ prompt, asGoal, gitContext }) {
-  const chunks = [];
-  if (gitContext) {
-    chunks.push(gitContext);
-    chunks.push("");
-  }
-  if (asGoal) {
-    chunks.push(
-      [
-        "Treat the following as a Kimi **Goal**: a clear finish line with verifiable evidence.",
-        "Use CreateGoal / goal tools if available, keep working until the objective is met or blocked,",
-        "and report evidence of completion.",
-        "",
-        `Objective: ${prompt}`,
-      ].join("\n"),
-    );
-  } else {
-    chunks.push(prompt);
-  }
-  return chunks.join("\n");
-}
-
 async function cmdSetup(asJson) {
+  const workspace = describeWorkspaceRoot(null);
   const kimiBin = resolveKimiBinary();
   const report = {
     ok: false,
@@ -155,23 +188,40 @@ async function cmdSetup(asJson) {
     modes: null,
     capabilities: null,
     pluginVersion: VERSION,
+    nodeVersion: process.version,
+    workspace,
+    compat: null,
     hostSessionId: getHostSessionId(),
     error: null,
+    errorCode: null,
     hints: [],
+    nextSteps: [],
   };
 
+  if (!nodeSemverOk(process.version, MIN_NODE)) {
+    report.error = nodeTooOldError(process.version);
+    report.errorCode = "NODE_TOO_OLD";
+    report.hints.push(...report.error.split("\n").slice(1));
+    failSetup(report, asJson);
+    return;
+  }
+
   if (!kimiBin) {
-    report.error = "kimi binary not found on PATH or in ~/.kimi-code/bin";
-    report.hints.push("Install Kimi Code CLI: https://github.com/MoonshotAI/kimi-code");
-    report.hints.push("Run `kimi login`, or set KIMI_CLI_PATH.");
+    report.error = binaryNotFoundError();
+    report.errorCode = "BINARY_NOT_FOUND";
+    report.hints.push("Install: https://github.com/MoonshotAI/kimi-code");
+    report.hints.push("Then: kimi login");
+    report.hints.push("Windows: set KIMI_CLI_PATH=%USERPROFILE%\\.kimi-code\\bin\\kimi.exe if needed");
     failSetup(report, asJson);
     return;
   }
 
   const ver = binaryAvailable(kimiBin, ["--version"]);
   report.version = ver.stdout || ver.stderr || null;
+  report.compat = compatNotes(report.version, VERSION);
   if (!ver.ok) {
-    report.error = `kimi --version failed`;
+    report.error = binaryBadError(report.version);
+    report.errorCode = "BINARY_BAD";
     report.hints.push("Reinstall Kimi Code or fix KIMI_CLI_PATH.");
     failSetup(report, asJson);
     return;
@@ -181,7 +231,7 @@ async function cmdSetup(asJson) {
   try {
     client = new KimiAcpClient({
       kimiBin,
-      cwd: process.cwd(),
+      cwd: workspace.cwd,
       mode: "default",
     });
     const init = await client.start();
@@ -203,13 +253,19 @@ async function cmdSetup(asJson) {
     report.modes = modeOpt?.options?.map((o) => o.value).join(", ") || "default, plan, auto, yolo";
     report.thinkingOptions = thinkOpt?.options?.map((o) => o.value) || null;
     report.ok = true;
+    report.nextSteps = setupNextSteps();
 
     if (!report.models.length) {
       report.hints.push("No models listed in ACP configOptions; check kimi login / providers.");
     }
+    if (report.compat?.level === "warn") {
+      report.hints.push(...report.compat.notes);
+    }
   } catch (error) {
-    report.error = error?.message || String(error);
-    report.hints.push("Run `kimi` in a terminal and complete login.");
+    const raw = error?.message || String(error);
+    report.error = acpFailedError(raw);
+    report.errorCode = /login|auth|401|403/i.test(raw) ? "LOGIN_REQUIRED" : "ACP_FAILED";
+    report.hints.push("Run `kimi login` in a normal terminal, then re-run setup.");
     report.hints.push("`kimi acp` should wait on stdin when launched alone.");
     process.exitCode = 1;
   } finally {
@@ -245,17 +301,18 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
   const kimiBin = requireKimiBin();
 
   if (!args.prompt && !args.mediaPaths.length) {
-    throw new Error('task requires a prompt (or media). Example: task --mode yolo -- "Fix the navbar"');
+    throw new Error(taskPromptRequiredError());
   }
 
-  // Pin media to absolute paths at enqueue time so background `_bg-run`
-  // does not depend on the launcher cwd.
-  const mediaPaths = args.mediaPaths.map((p) => resolve(p));
-
-  const media = buildMediaPromptParts(mediaPaths);
+  // Resolve media against workspace cwd (agent-facing); pin absolute paths for bg jobs.
+  const media = buildMediaPromptParts(args.mediaPaths, { cwd });
   if (media.errors.length) {
-    throw new Error(media.errors.join("; "));
+    throw new Error(media.errors.join("\n\n"));
   }
+  const mediaPaths = args.mediaPaths.map((p) => {
+    const abs = resolve(cwd, p);
+    return fs.existsSync(abs) ? abs : resolve(p);
+  });
 
   let gitContext = "";
   if (args.withGit) {
@@ -266,6 +323,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
     prompt: args.prompt || "(see attached media)",
     asGoal,
     gitContext,
+    bridgeNotes: bridgeNotesEnabled(),
   });
 
   let sessionMode = "new";
@@ -275,7 +333,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
   } else if (args.session || args.resume) {
     sessionId = findResumeSessionId(cwd, args.session);
     if (!sessionId) {
-      throw new Error("No resumable Kimi session found for this workspace. Omit --resume or pass --session <id>.");
+      throw new Error(resumeSessionError());
     }
     // resume without full history replay (lighter); use load if you need replay
     sessionMode = "resume";
@@ -317,6 +375,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
       sessionMode,
       sessionId,
       extraBlocks: media.blocks,
+      asGoal,
     });
   } catch (error) {
     // Keep a failure record so status/result can surface it later.
@@ -346,9 +405,11 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
 
   const jobId = generateJobId();
   const hostSessionId = getHostSessionId();
+  // Peer posture: empty completion is a failed handoff (shared acceptance.mjs).
+  const acc = companionTaskAcceptance(result);
   writeJob({
     id: jobId,
-    status: "completed",
+    status: acc.jobStatus,
     cwd,
     mode,
     model: args.model || null,
@@ -364,7 +425,13 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
     toolEventCount: result.toolCalls?.length || 0,
     mediaNotes: media.notes,
     asGoal,
-    error: null,
+    emptyAgentText: acc.emptyAgentText,
+    emptyRetried: acc.emptyRetried,
+    emptyRecoveryNudged: acc.emptyRecoveryNudged,
+    incompleteContinued: acc.incompleteContinued,
+    continueCount: acc.continueCount,
+    incompleteReason: acc.incompleteReason,
+    error: acc.jobError,
     pid: null,
   });
 
@@ -379,12 +446,23 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
     toolEventCount: result.toolCalls?.length || 0,
     mediaNotes: media.notes,
     agent: result.init?.agentInfo || null,
+    emptyAgentText: acc.emptyAgentText,
+    emptyRetried: acc.emptyRetried,
+    emptyRecoveryNudged: acc.emptyRecoveryNudged,
+    incompleteContinued: acc.incompleteContinued,
+    continueCount: acc.continueCount,
+    incompleteReason: acc.incompleteReason,
+    ok: acc.ok,
   };
 
   if (args.asJson) {
     outputJson(payload);
   } else {
     outputText(renderTaskResult(payload));
+  }
+  // Non-zero exit so hosts (CC/Grok/Codex) re-dispatch instead of treating empty as success.
+  if (acc.exitCode !== 0) {
+    process.exitCode = acc.exitCode;
   }
 }
 
@@ -417,9 +495,11 @@ function reconcileStaleJobs() {
     writeJob({
       ...job,
       status: "failed",
+      phase: PHASE.FAILED,
       updatedAt: nowIso(),
       pid: null,
       orphaned: true,
+      lastProgressMessage: job.lastProgressMessage || "orphan reconciled (runner dead)",
       error:
         job.error ||
         (pid
@@ -444,6 +524,7 @@ function startBackgroundJob(jobSpec) {
   const job = {
     id: jobId,
     status: "running",
+    phase: PHASE.QUEUED,
     ...jobSpec,
     promptPreview: String(jobSpec.prompt || "").slice(0, 120),
     hostSessionId: getHostSessionId(),
@@ -454,6 +535,7 @@ function startBackgroundJob(jobSpec) {
     resultText: null,
     stopReason: null,
     toolEventCount: 0,
+    lastProgressMessage: "queued",
     error: null,
     logFile,
   };
@@ -489,6 +571,8 @@ function startBackgroundJob(jobSpec) {
   }
 
   job.pid = runner.pid ?? null;
+  job.phase = PHASE.LAUNCHING;
+  job.lastProgressMessage = `spawned runner pid=${job.pid}`;
   job.updatedAt = nowIso();
   writeJob(job);
 
@@ -498,8 +582,10 @@ function startBackgroundJob(jobSpec) {
       writeJob({
         ...cur,
         status: "failed",
+        phase: PHASE.FAILED,
         updatedAt: nowIso(),
         pid: null,
+        lastProgressMessage: "spawn failed",
         error: `failed to spawn background runner: ${err?.message || err}`,
       });
     }
@@ -519,9 +605,11 @@ function startBackgroundJob(jobSpec) {
         writeJob({
           ...cur,
           status: "failed",
+          phase: PHASE.FAILED,
           updatedAt: nowIso(),
           pid: null,
           orphaned: true,
+          lastProgressMessage: cur.lastProgressMessage || "runner exited without finalize",
           error:
             cur.error ||
             `orphan: background runner exited (code=${code}, signal=${signal}) without finalizing`,
@@ -535,8 +623,10 @@ function startBackgroundJob(jobSpec) {
   const payload = {
     jobId,
     status: "running",
+    phase: PHASE.LAUNCHING,
     pid: job.pid,
     logFile,
+    // CC/Grok hosts: point at status/result for detached work.
     message: `Kimi task started in background (${jobId}). Use status/result (or --wait). Log: ${logFile}`,
   };
   if (jobSpec.asJson) {
@@ -565,6 +655,8 @@ async function cmdBgRun(jobId) {
   job = {
     ...job,
     pid: process.pid,
+    phase: PHASE.STARTING_ACP,
+    lastProgressMessage: "runner start",
     updatedAt: nowIso(),
     logFile: job.logFile || jobLogPath(jobId),
   };
@@ -574,6 +666,8 @@ async function cmdBgRun(jobId) {
   let finalized = false;
   let toolEventCount = 0;
   let lastSessionId = job.sessionId || null;
+  let lastProgressMessage = "runner start";
+  let acpReady = false;
 
   const snapshot = () => readJob(jobId) || job;
 
@@ -586,17 +680,31 @@ async function cmdBgRun(jobId) {
       clearInterval(heartbeat);
     }
     const cur = snapshot();
+    const status = patch.status || cur.status;
+    const phase =
+      patch.phase ||
+      (status === "completed"
+        ? PHASE.COMPLETED
+        : status === "cancelled"
+          ? PHASE.CANCELLED
+          : status === "failed"
+            ? PHASE.FAILED
+            : cur.phase);
     writeJob({
       ...cur,
       ...patch,
+      status,
+      phase,
       updatedAt: nowIso(),
       pid: null,
       toolEventCount:
         patch.toolEventCount != null ? patch.toolEventCount : toolEventCount,
+      lastProgressMessage:
+        patch.lastProgressMessage || lastProgressMessage || cur.lastProgressMessage || null,
     });
     appendJobLog(
       jobId,
-      `finalize status=${patch.status} error=${patch.error || ""} tools=${patch.toolEventCount ?? toolEventCount}`,
+      `finalize status=${status} phase=${phase} error=${patch.error || ""} tools=${patch.toolEventCount ?? toolEventCount}`,
     );
   };
 
@@ -609,11 +717,13 @@ async function cmdBgRun(jobId) {
       writeJob({
         ...cur,
         status: "running",
+        phase: acpReady ? PHASE.RUNNING : PHASE.STARTING_ACP,
         updatedAt: nowIso(),
         heartbeatAt: nowIso(),
         pid: process.pid,
         sessionId: lastSessionId || cur.sessionId || null,
         toolEventCount,
+        lastProgressMessage,
       });
     } catch {
       // ignore
@@ -626,9 +736,11 @@ async function cmdBgRun(jobId) {
   const failOrphan = (reason) => {
     finalize({
       status: "failed",
+      phase: PHASE.FAILED,
       orphaned: true,
       error: reason,
       sessionId: lastSessionId,
+      lastProgressMessage: reason,
     });
   };
 
@@ -658,11 +770,13 @@ async function cmdBgRun(jobId) {
           writeJob({
             ...cur,
             status: "failed",
+            phase: PHASE.FAILED,
             updatedAt: nowIso(),
             pid: null,
             orphaned: true,
             error: cur.error || "orphan: runner process exited without finalizing",
             toolEventCount,
+            lastProgressMessage: lastProgressMessage || cur.lastProgressMessage,
           });
         }
       } catch {
@@ -673,7 +787,7 @@ async function cmdBgRun(jobId) {
 
   const kimiBin = resolveKimiBinary();
   if (!kimiBin) {
-    finalize({ status: "failed", error: "kimi binary not found" });
+    finalize({ status: "failed", phase: PHASE.FAILED, error: "kimi binary not found" });
     process.exit(1);
   }
 
@@ -682,7 +796,15 @@ async function cmdBgRun(jobId) {
     if (job.withGit) {
       // prompt already includes git when queued; re-collect is optional noise
     }
-    appendJobLog(jobId, `acp turn begin cwd=${job.cwd}`);
+    lastProgressMessage = `acp turn begin cwd=${job.cwd}`;
+    writeJob({
+      ...snapshot(),
+      phase: PHASE.STARTING_ACP,
+      lastProgressMessage,
+      updatedAt: nowIso(),
+      pid: process.pid,
+    });
+    appendJobLog(jobId, lastProgressMessage);
     const result = await runKimiAcpTurn({
       kimiBin,
       cwd: job.cwd,
@@ -690,36 +812,70 @@ async function cmdBgRun(jobId) {
       mode: job.mode || "yolo",
       model: job.model || null,
       thinking: job.thinking || null,
-      requestTimeoutMs: job.requestTimeoutMs || undefined,
+      requestTimeoutMs: job.requestTimeoutMs ?? null,
       sessionMode: job.sessionMode || "new",
       sessionId: job.sessionId || null,
       extraBlocks: media.blocks,
+      asGoal: Boolean(job.asGoal),
       onUpdate: (update) => {
         const kind = update?.sessionUpdate;
         if (kind === "tool_call" || kind === "tool_call_update") {
+          acpReady = true;
           toolEventCount += 1;
+          const title = update.title || update.toolCallId || kind;
+          const status = update.status ? `:${update.status}` : "";
+          lastProgressMessage = `tool ${title}${status} (#${toolEventCount})`;
+        } else if (kind === "agent_message_chunk") {
+          acpReady = true;
+          if (!lastProgressMessage || lastProgressMessage.startsWith("acp")) {
+            lastProgressMessage = "agent_message";
+          }
         }
-        // session id is set on the client after new/load/resume; result carries it
       },
-      onLog: (msg) => appendJobLog(jobId, `acp: ${msg}`),
+      onLog: (msg) => {
+        appendJobLog(jobId, `acp: ${msg}`);
+        if (String(msg).includes("set_config_option") || String(msg).includes("set_mode")) {
+          acpReady = true;
+          lastProgressMessage = String(msg);
+        }
+      },
     });
     lastSessionId = result.sessionId || lastSessionId;
     toolEventCount = Math.max(toolEventCount, result.toolCalls?.length || 0);
+    const acc = companionTaskAcceptance(result);
+    lastProgressMessage =
+      `${acc.jobStatus} stop=${result.stopReason || "unknown"} tools=${toolEventCount}` +
+      (acc.incompleteContinued ? ` continued=${acc.continueCount}` : "") +
+      (acc.emptyRetried ? " emptyRetried" : "") +
+      (acc.emptyRecoveryNudged ? " emptyRecovery" : "");
     finalize({
-      status: "completed",
+      status: acc.jobStatus,
+      phase: acc.jobStatus === "failed" ? PHASE.FAILED : PHASE.COMPLETED,
       sessionId: result.sessionId,
       resultText: result.text,
       stopReason: result.stopReason,
       toolEventCount,
       mediaNotes: media.notes,
-      error: null,
+      emptyAgentText: acc.emptyAgentText,
+      emptyRetried: acc.emptyRetried,
+      emptyRecoveryNudged: acc.emptyRecoveryNudged,
+      incompleteContinued: acc.incompleteContinued,
+      continueCount: acc.continueCount,
+      incompleteReason: acc.incompleteReason,
+      error: acc.jobError,
       orphaned: false,
+      lastProgressMessage,
     });
+    if (acc.exitCode !== 0) {
+      process.exitCode = acc.exitCode;
+    }
   } catch (error) {
     finalize({
       status: "failed",
+      phase: PHASE.FAILED,
       sessionId: lastSessionId,
       error: error?.message || String(error),
+      lastProgressMessage: error?.message || String(error),
     });
     process.exitCode = 1;
   }
@@ -878,6 +1034,9 @@ async function cmdCancel(argv) {
   const updated = {
     ...job,
     status: job.status === "running" ? "cancelled" : job.status,
+    phase: job.status === "running" ? PHASE.CANCELLED : job.phase || job.status,
+    lastProgressMessage:
+      job.status === "running" ? "cancelled by host" : job.lastProgressMessage,
     updatedAt: nowIso(),
     pid: null,
   };

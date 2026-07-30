@@ -17,7 +17,7 @@ Marketplace id: `kimi-code-cc` · plugin id: `kimi` → install as `kimi@kimi-co
 
 Sibling package for Codex: `kimi-plugin-codex` (different plugin format).
 
-## Version (keep in sync — all **0.1.1**)
+## Version (keep in sync — all **0.2.0**)
 
 | Location | Field |
 | --- | --- |
@@ -79,7 +79,7 @@ node plugins/kimi/scripts/kimi-companion.mjs task --resume -- \
   "Continue from where you left off"
 ```
 
-Optional env: `KIMI_CLI_PATH`, `KIMI_PLUGIN_CC_DATA_DIR`, `CLAUDE_SESSION_ID` / `GROK_SESSION_ID`.
+Optional env: `KIMI_CLI_PATH`, `KIMI_PLUGIN_CC_DATA_DIR`, `CLAUDE_SESSION_ID` / `GROK_SESSION_ID`, `KIMI_BRIDGE_HANDOFF=1` (legacy host handoff bullets; default off), `KIMI_FORCE_CONTINUE=0` (disable Mode B incomplete-work continue nudges; default on).
 
 ### Companion commands
 
@@ -93,12 +93,14 @@ Optional env: `KIMI_CLI_PATH`, `KIMI_PLUGIN_CC_DATA_DIR`, `CLAUDE_SESSION_ID` / 
 
 ## How host agents should call Kimi
 
-1. **Substantial** implementation / UI / multimodal / multi-file → Agent `kimi:kimi-rescue` (see `/kimi:rescue`). Do **not** call `Skill(kimi:kimi-rescue)` or re-enter the slash from a forked agent.
-2. **Light** one-shot → `kimi-companion.mjs task` (or `/kimi:task`).
+1. **REQUIRED** for any frontend/UI (including style mocks, reference pages, prototypes, “try a look”), CSS/layout/components, screenshot/video visual bugs, multimodal debugging, multi-file coding → Agent `kimi:kimi-rescue` (see `/kimi:rescue`). Main agent **MUST NOT** write/edit those UI files itself. Do **not** call `Skill(kimi:kimi-rescue)` or re-enter the slash from a forked agent.
+2. **Light** non-UI one-shot only → `kimi-companion.mjs task` (or `/kimi:task`).
 3. One companion invocation; return **stdout verbatim**. No invented system prompts or review rubrics.
 4. Prefer `--image` / `--video` / `--media` for screenshots and recordings over describing pixels in prose.
 5. Default `--mode yolo` unless the user asked for plan/auto/default.
-6. Preserve `--resume` / `--fresh` / `--session` / `--goal` / `--git` / `--model` / `--thinking` / `--background`.
+6. Preserve `--resume` / `--fresh` / `--session` / `--goal` / `--git` / `--model` / `--thinking` / `--background` / `--json`.
+7. Soft “prefer” is not enough: treat handoff as **mandatory** whenever the task touches UI surfaces and Kimi is available (after `/kimi:setup` / companion setup ok).
+8. **Empty / failed handoff:** exit ≠ 0, `(no agent text)`, or JSON `ok:false` / `emptyAgentText:true` → re-dispatch **once** (`--fresh`), still **no** main-thread UI coding. See rescue / `kimi-cli-runtime` acceptance tables.
 
 Skill contract: `plugins/kimi/skills/kimi-cli-runtime/SKILL.md`.
 
@@ -111,6 +113,22 @@ There is no human answering Kimi permission prompts; the companion answers them.
 | `yolo` / `auto` | Upstream Kimi semantics |
 | `default` | Auto-approve tool requests (prefer session-level allow) |
 | `plan` | Approve read-oriented tools; reject mutating tools; **decline** `ExitPlanMode` (`plan_reject_and_exit`) so plan mode delivers a plan and does **not** start execution |
+
+### Turn acceptance (Mode A / Mode B — keep isomorphic with kimi-plugin-codex)
+
+Shared policy lives in `scripts/lib/turn-policy.mjs` and is applied inside `runKimiAcpTurn`:
+
+| Mode | Symptom | Companion action |
+| --- | --- | --- |
+| **A — empty** | `end_turn` with no agent text and no tools | Up to **2** fresh-session retries, then **1** same-session empty-recovery nudge (`emptyAgentText` / `emptyRetried` / `emptyRecoveryNudged`). Still empty → job **`failed`**, **exit code 1** |
+| **B — incomplete** | Disk/action task ends after plan text or only read/search tools (no Write/Edit/Bash) | Up to **2** **same-session** continue nudges (`incompleteContinued` / `continueCount` / `incompleteReason`); stagnates if no progress |
+
+- **B is off** in `plan` mode (plan text is the deliverable).
+- **B is off** for Q&A / how-to (`What is…`, `How do I implement…`), pure **reply-exactly** probes, and completion-claim text without tools.
+- **B is on** for EN/CJK disk-action verbs, goals, file-path cues; not bare `ui`/`css` tokens alone.
+- Disable B globally: `KIMI_FORCE_CONTINUE=0`.
+- Pure empty turns are **not** reclassified as B; Mode A owns them.
+- Claude-style `message.result` reassembly does **not** apply — Kimi empty turns have no recoverable result body (peer empty detection + retry + fail-loud only).
 
 ### Timeouts (agent-controlled)
 
@@ -133,7 +151,8 @@ There is no human answering Kimi permission prompts; the companion answers them.
 - Host session binding via `CLAUDE_SESSION_ID` / `GROK_SESSION_ID` is **best-effort**; missing id → most recent job in current workspace.
 - Foreground failures are recorded as failed jobs (visible via `status` / `result`).
 - **Orphan recovery:** `status` / `result` / `--wait` call `reconcileStaleJobs()` — `running` jobs whose runner PID is dead are rewritten to `failed` with `orphaned: true` (no more infinite fake "running").
-- Background runners heartbeat `updatedAt` / `toolEventCount` every ~10s; prefer **foreground** rescue unless the user asks to detach.
+- **Job phases:** `queued` → `launching` → `starting_acp` → `running` → terminal; `lastProgressMessage` surfaces tool/agent progress on status.
+- Background runners heartbeat `updatedAt` / `toolEventCount` / phase every ~10s; prefer **foreground** rescue unless the user asks to detach.
 
 ## Platform notes
 

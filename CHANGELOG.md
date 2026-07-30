@@ -2,7 +2,33 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
-## Unreleased
+## 0.2.0
+
+Public package version continues from GitHub **0.1.x** as **0.2.0** (aligned with **kimi-plugin-codex** 0.2.0).
+
+### Added
+- Job **phase** + **lastProgressMessage** on background jobs (queued → launching → starting_acp → running → terminal)
+- Richer status render: phase, progress, resume hint; status list preview 50 + phase padEnd 18
+- `lib/prompt.mjs` + `tests/prompt.test.mjs`; optional `KIMI_BRIDGE_HANDOFF=1` bridge notes (default off)
+
+### Changed
+- Core companion alignment with **kimi-plugin-codex** 0.2.0 (shared progress / prompt stack)
+- Harder host triggers: agent/command/skill copy uses **REQUIRED / MUST / MUST NOT** for frontend/UI (including style mocks and reference pages); main agent must not implement UI when Kimi is ready
+- Host command shells **functionally similar** to Codex skills: routing tables (UI → rescue), flag lists, long-run status/result notes, setup nextSteps (Claude/Grok/CLI), Fix: `/kimi:sessions`
+- Version **0.2.0** (aligned with sibling Codex package)
+
+## 0.1.2
+
+### Added
+- **First verify** path in README + setup `nextSteps` (hand a small frontend task to Kimi)
+- Setup doctor: Node version, workspace source, soft Kimi Code **compat** notes, actionable `errorCode`
+- Standardized `[kimi-plugin]` errors with numbered **Fix** lists (`lib/errors.mjs`)
+- Workspace root resolution from host env (`CLAUDE_PROJECT_DIR`, `GROK_WORKSPACE`, `KIMI_WORKSPACE`, …)
+- Media path resolve against workspace cwd + clearer not-found errors (agent-facing)
+
+### Changed
+- Happy path only in user docs: `/kimi:rescue` for frontend/UI/screenshot/video; advanced details stay in AGENTS.md
+- Stronger host triggers for frontend / visual / video handoff (`kimi-rescue`, setup, rescue command)
 
 ## 0.1.1
 
