@@ -1,8 +1,8 @@
 {
   "name": "kimi",
   "displayName": "Kimi Code",
-  "version": "0.1.1",
-  "description": "Kimi Code subagent for Claude Code / Grok via ACP — multimodal, goals, resume, frontend-first.",
+  "version": "0.1.2",
+  "description": "Hand frontend/UI, screenshot/video bugs, and multi-file work to local Kimi Code (ACP subagent). Happy path: /kimi:rescue.",
   "author": {
     "name": "oppnc",
     "url": "https://github.com/oppnc"

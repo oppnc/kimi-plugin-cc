@@ -4,6 +4,19 @@
 
 ## 未发布 (Unreleased)
 
+## 0.1.2
+
+### 新增
+- README + setup 的 **首次验证**（把一个小前端任务交给 Kimi）
+- Setup doctor：Node 版本、workspace 来源、Kimi Code **compat** 软检查、可行动 `errorCode`
+- 标准化 `[kimi-plugin]` 错误与 **Fix** 列表（`lib/errors.mjs`）
+- 从宿主环境解析工作区根目录
+- 媒体路径相对 workspace 解析 + 更清晰的缺失错误
+
+### 变更
+- 用户文档只保留主路径：`/kimi:rescue`；高级细节见 AGENTS.md
+- 加强前端 / 截图 / 视频 触发描述
+
 ## 0.1.1
 
 ### 修复

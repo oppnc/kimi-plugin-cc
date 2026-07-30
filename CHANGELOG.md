@@ -4,6 +4,19 @@
 
 ## Unreleased
 
+## 0.1.2
+
+### Added
+- **First verify** path in README + setup `nextSteps` (hand a small frontend task to Kimi)
+- Setup doctor: Node version, workspace source, soft Kimi Code **compat** notes, actionable `errorCode`
+- Standardized `[kimi-plugin]` errors with numbered **Fix** lists (`lib/errors.mjs`)
+- Workspace root resolution from host env (`CLAUDE_PROJECT_DIR`, `GROK_WORKSPACE`, `KIMI_WORKSPACE`, …)
+- Media path resolve against workspace cwd + clearer not-found errors (agent-facing)
+
+### Changed
+- Happy path only in user docs: `/kimi:rescue` for frontend/UI/screenshot/video; advanced details stay in AGENTS.md
+- Stronger host triggers for frontend / visual / video handoff (`kimi-rescue`, setup, rescue command)
+
 ## 0.1.1
 
 ### Fixed

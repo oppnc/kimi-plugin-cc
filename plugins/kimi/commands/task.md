@@ -1,17 +1,12 @@
 ---
-description: Run a task on local Kimi Code via ACP (multimodal/frontend-friendly; Kimi keeps its own prompts)
-argument-hint: '[--mode yolo|plan|auto|default] [--image p] [--video p] [--resume] [--git] [--background] <prompt>'
+description: Light one-shot task on local Kimi Code (prefer /kimi:rescue for frontend/UI)
+argument-hint: '[--mode yolo|plan] [--image p] [--video p] [--resume] <prompt>'
 allowed-tools: Bash(node:*), AskUserQuestion, Agent
 ---
 
-Forward to Kimi. Do not rewrite into a new system prompt.
+For **frontend/UI, screenshots/video, or multi-file** work, prefer Agent `kimi:kimi-rescue` (see `/kimi:rescue`).
 
-Raw arguments:
-$ARGUMENTS
-
-For substantial implementation/UI work, prefer Agent `kimi:kimi-rescue` (see `/kimi:rescue`).
-
-Otherwise:
+Otherwise forward a light one-shot:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task --mode yolo $ARGUMENTS
@@ -19,6 +14,4 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task --mode yolo $ARGUME
 
 If the user already passed `--mode`, do not add another.
 
-Media: keep `--image` / `--video` paths for screenshots and screen recordings (Kimi strength).
-
-Return stdout verbatim.
+Keep `--image` / `--video` paths when present. Return stdout verbatim.
