@@ -47,6 +47,7 @@ import {
 } from "./lib/render.mjs";
 import { companionTaskAcceptance } from "./lib/acceptance.mjs";
 import { bridgeNotesEnabled, buildUserPrompt } from "./lib/prompt.mjs";
+import { forceContinueEnabled } from "./lib/turn-policy.mjs";
 import { describeWorkspaceRoot, resolveWorkspaceRoot } from "./lib/workspace.mjs";
 
 const VALID_MODES = new Set(["default", "plan", "auto", "yolo"]);
@@ -91,13 +92,18 @@ function printUsage() {
       "    (non-interactive: default auto-approves; plan rejects writes + ExitPlanMode)",
       "  --model <id>  --thinking <level>",
       "  --timeout <ms>   optional ACP deadline (default: none; poll status/result)",
+      "  --empty-retries <n>   Mode A empty-turn fresh-session retries (default 5; 0 disables)",
       "  --cwd <path>  --session <id>  --resume / --resume-last  --fresh",
       "  --image <path>  --video <path>  --media <path>   (repeatable)",
       "  --git [--base <ref>]   attach git status/diff (not a review rubric)",
       "  --goal                 frame prompt as a Kimi Goal objective",
       "  --background  --json",
       "",
+      "status/result --wait: non-zero exit if the job is still running when the wait budget",
+      "  (--wait-timeout) runs out; a timed-out turn keeps its session so --resume can continue it.",
+      "",
       "Env: KIMI_CLI_PATH, KIMI_PLUGIN_CC_DATA_DIR, CLAUDE_SESSION_ID / GROK_SESSION_ID,",
+      "     KIMI_EMPTY_RETRIES (default 5), KIMI_FORCE_CONTINUE (default 1),",
       "     KIMI_BRIDGE_HANDOFF=1 (optional legacy host handoff bullets on task prompt)",
     ].join("\n"),
   );
@@ -161,16 +167,20 @@ function findResumeSessionId(cwd, explicitSession) {
   }
   const host = getHostSessionId();
   const jobs = listJobs({ cwd, limit: 50 });
+  // Completed jobs first; failed jobs that kept their session (e.g. an ACP
+  // timeout) are also resumable — same thread, continue the work.
   const candidates = jobs.filter(
-    (j) => j.sessionId && j.status === "completed" && j.sessionId.startsWith("session_"),
+    (j) => j.sessionId && j.sessionId.startsWith("session_"),
   );
+  const byStatus = (s) => candidates.filter((j) => j.status === s);
+  const ordered = [...byStatus("completed"), ...byStatus("failed"), ...candidates];
   if (host) {
-    const forHost = candidates.find((j) => j.hostSessionId === host);
+    const forHost = ordered.find((j) => j.hostSessionId === host);
     if (forHost) {
       return forHost.sessionId;
     }
   }
-  return candidates[0]?.sessionId || null;
+  return ordered[0]?.sessionId || null;
 }
 
 async function cmdSetup(asJson) {
@@ -358,6 +368,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
       sessionMode,
       sessionId,
       requestTimeoutMs,
+      emptyRetries: args.emptyRetries ?? null,
       asJson: args.asJson,
     });
   }
@@ -376,9 +387,12 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
       sessionId,
       extraBlocks: media.blocks,
       asGoal,
+      emptyRetries: args.emptyRetries ?? null,
     });
   } catch (error) {
-    // Keep a failure record so status/result can surface it later.
+    // Keep a failure record so status/result can surface it later. A timed-out
+    // turn keeps its ACP session (error.sessionId) so the same thread can be
+    // resumed with --resume.
     writeJob({
       id: generateJobId(),
       status: "failed",
@@ -390,7 +404,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
       promptPreview: userText.slice(0, 120),
       createdAt: nowIso(),
       updatedAt: nowIso(),
-      sessionId: sessionId || null,
+      sessionId: error?.sessionId || sessionId || null,
       hostSessionId: getHostSessionId(),
       resultText: null,
       stopReason: null,
@@ -426,6 +440,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
     mediaNotes: media.notes,
     asGoal,
     emptyAgentText: acc.emptyAgentText,
+    planEmptyText: acc.planEmptyText,
     emptyRetried: acc.emptyRetried,
     emptyRecoveryNudged: acc.emptyRecoveryNudged,
     incompleteContinued: acc.incompleteContinued,
@@ -447,6 +462,7 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
     mediaNotes: media.notes,
     agent: result.init?.agentInfo || null,
     emptyAgentText: acc.emptyAgentText,
+    planEmptyText: acc.planEmptyText,
     emptyRetried: acc.emptyRetried,
     emptyRecoveryNudged: acc.emptyRecoveryNudged,
     incompleteContinued: acc.incompleteContinued,
@@ -473,7 +489,8 @@ async function cmdTask(argv, { forceGoal = false } = {}) {
  */
 function reconcileStaleJobs() {
   let n = 0;
-  // Wide scan: all workspaces, up to prune bound
+  // Wide scan: all workspaces, up to prune bound (listJobs sorts newest first,
+  // so the 100-job bound naturally covers the newest jobs).
   const jobs = listJobs({ limit: 100 });
   const now = Date.now();
   for (const job of jobs) {
@@ -734,6 +751,12 @@ async function cmdBgRun(jobId) {
   }
 
   const failOrphan = (reason) => {
+    // A host cancel may have already flipped this job to "cancelled"; do not
+    // overwrite that terminal state with "failed" (race: SIGTERM vs cancel).
+    const cur = snapshot();
+    if (cur.status === "cancelled") {
+      return;
+    }
     finalize({
       status: "failed",
       phase: PHASE.FAILED,
@@ -817,6 +840,8 @@ async function cmdBgRun(jobId) {
       sessionId: job.sessionId || null,
       extraBlocks: media.blocks,
       asGoal: Boolean(job.asGoal),
+      emptyRetries: job.emptyRetries ?? null,
+      forceContinue: forceContinueEnabled(),
       onUpdate: (update) => {
         const kind = update?.sessionUpdate;
         if (kind === "tool_call" || kind === "tool_call_update") {
@@ -857,6 +882,7 @@ async function cmdBgRun(jobId) {
       toolEventCount,
       mediaNotes: media.notes,
       emptyAgentText: acc.emptyAgentText,
+      planEmptyText: acc.planEmptyText,
       emptyRetried: acc.emptyRetried,
       emptyRecoveryNudged: acc.emptyRecoveryNudged,
       incompleteContinued: acc.incompleteContinued,
@@ -870,10 +896,12 @@ async function cmdBgRun(jobId) {
       process.exitCode = acc.exitCode;
     }
   } catch (error) {
+    // A request timeout keeps the ACP session alive (client sends
+    // session/cancel); surface error.sessionId so the thread stays resumable.
     finalize({
       status: "failed",
       phase: PHASE.FAILED,
-      sessionId: lastSessionId,
+      sessionId: error?.sessionId || lastSessionId,
       error: error?.message || String(error),
       lastProgressMessage: error?.message || String(error),
     });
@@ -943,7 +971,14 @@ async function cmdStatus(argv) {
     } else {
       outputText(renderJobStatus(job));
     }
-    if (!job || job.status === "failed" || job.status === "cancelled") {
+    // Still running when the wait budget ran out → non-zero so hosts do not
+    // mistake a wait timeout for a completed handoff.
+    if (
+      !job ||
+      job.status === "failed" ||
+      job.status === "cancelled" ||
+      job.status === "running"
+    ) {
       process.exitCode = 1;
     }
     return;
@@ -984,7 +1019,18 @@ async function cmdResult(argv) {
     const waitRaw = parsed.options["wait-timeout"];
     const timeout =
       waitRaw != null && waitRaw !== "" ? Number(waitRaw) : null;
-    await waitForJob(jobId, timeout);
+    const waited = await waitForJob(jobId, timeout);
+    // Wait budget ran out and the job is still running → non-zero so hosts
+    // do not mistake a wait timeout for a completed handoff.
+    if (waited?.status === "running") {
+      if (asJson) {
+        outputJson(waited);
+      } else {
+        outputText(renderJobStatus(waited));
+      }
+      process.exitCode = 1;
+      return;
+    }
   }
 
   const job = jobId ? refreshJob(jobId) : null;
@@ -1004,8 +1050,6 @@ async function cmdResult(argv) {
   }
   if (job.status === "failed" || job.status === "cancelled") {
     process.exitCode = 1;
-  } else if (job.status === "running") {
-    process.exitCode = 0;
   }
 }
 

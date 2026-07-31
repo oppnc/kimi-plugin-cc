@@ -133,8 +133,9 @@ Shared policy lives in `scripts/lib/turn-policy.mjs` and is applied inside `runK
 ### Timeouts (agent-controlled)
 
 - **Default: no ACP request deadline** for `task` / `goal` / background jobs. Kimi may run until it finishes, fails, or is cancelled.
-- Optional: `--timeout <ms>` on task/goal when the agent wants a hard stop.
-- Prefer **poll** over guessing: `status` / `result` (and `--wait`) show whether a job is still running. Optional `--wait-timeout <ms>` on those commands; without it, `--wait` also has no deadline.
+- Optional: `--timeout <ms>` on task/goal when the agent wants a **soft** stop. On timeout the companion sends `session/cancel` and keeps the session alive — the job records `sessionId` and `--resume` can continue the same thread (it is **not** a lost handoff).
+- `--empty-retries <n>` sets the Mode A empty-turn fresh-session retry budget (default **5**, `KIMI_EMPTY_RETRIES` env, `0` disables).
+- Prefer **poll** over guessing: `status` / `result` (and `--wait`) show whether a job is still running. Optional `--wait-timeout <ms>` on those commands; without it, `--wait` also has no deadline. When the wait budget runs out while the job is still `running`, the command exits **non-zero** — a wait timeout is not a completed handoff.
 - Handshake (`initialize` / config) still uses a short internal timeout so a dead binary fails fast.
 - If a deadline is set and fires, errors should include kimi stderr tail when available.
 
@@ -146,7 +147,7 @@ Shared policy lives in `scripts/lib/turn-policy.mjs` and is applied inside `runK
 
 ## Jobs & host scoping
 
-- Job store: `KIMI_PLUGIN_CC_DATA_DIR` or `~/.kimi-plugin-cc`; pruned to newest ~100.
+- Job store: `KIMI_PLUGIN_CC_DATA_DIR` or `~/.kimi-plugin-cc`; pruned to newest ~100 (log files pruned with their job).
 - Background logs: `~/.kimi-plugin-cc/logs/<jobId>.log` (stdio of `_bg-run`, not `ignore`).
 - Host session binding via `CLAUDE_SESSION_ID` / `GROK_SESSION_ID` is **best-effort**; missing id → most recent job in current workspace.
 - Foreground failures are recorded as failed jobs (visible via `status` / `result`).

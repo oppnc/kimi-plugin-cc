@@ -45,6 +45,12 @@ Companion is a long-running ACP stream. The host shell has a default timeout tha
 - `--background` / `--wait` are **parent-only** flags; the subagent adds `--background` to the companion command, never passes it through into a nested re-handoff.
 - If a foreground pipe returns **empty stdout after only a few seconds** with no companion `[kimi-plugin]` error block, treat it as a **host shell kill, not Mode A**: re-spawn the subagent once. Do **not** switch to `--background` as a workaround - it makes the subagent return empty.
 
+## Timeout keeps the session
+
+`--timeout <ms>` is a soft ACP deadline: on timeout the companion sends `session/cancel`
+and keeps the session alive. Resume the same thread with `--resume` / `--session <id>` —
+do not treat a timeout as a lost handoff.
+
 ## Empty / failed handoff (re-dispatch, do not self-implement)
 
 Companion signals a failed empty ACP turn with **non-zero exit**, stdout `(no agent text)`, and/or JSON `ok:false` / `emptyAgentText:true` (after its own retries). That is **not** a clarifying question.
