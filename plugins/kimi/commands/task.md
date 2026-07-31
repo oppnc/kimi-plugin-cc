@@ -20,7 +20,18 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/kimi-companion.mjs" task --mode yolo $ARGUME
 If the user already passed `--mode`, do not add another.
 
 Supported flags (pass through when present): `--mode`, `--model`, `--thinking`, `--image` / `--video` / `--media`,
-`--cwd`, `--resume` / `--session` / `--fresh`, `--git` / `--base`, `--goal`, `--background`, `--timeout`, `--json`.
+`--cwd`, `--resume` / `--session` / `--fresh`, `--git` / `--base`, `--goal`, `--background`, `--timeout`,
+`--empty-retries`, `--json`.
+
+## Timeouts and retries
+
+- `--timeout <ms>` sets an ACP request deadline. On timeout the companion keeps the
+  **session alive** (`session/cancel`, not a kill): resume the same thread with
+  `--resume` / `--session <id>` afterwards.
+- `--empty-retries <n>` sets the Mode A empty-turn fresh-session retry budget
+  (default 5, `KIMI_EMPTY_RETRIES` env, `0` disables).
+- `status --wait` / `result --wait` exit non-zero when the wait budget runs out and
+  the job is still running — a wait timeout is **not** a completed handoff.
 
 ## Long-running
 
