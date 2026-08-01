@@ -4,15 +4,21 @@
 
 [![CI](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml/badge.svg)](https://github.com/oppnc/kimi-plugin-cc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-green.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.1-green.svg)](./CHANGELOG.md)
 
-Call local **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** as a subagent from **Claude Code** or **Grok**.
+This repo does one thing: call local **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** as a subagent from **Claude Code** or **Grok** (and compatible harnesses).
 
-Kimi k3 is strong at frontend and multimodal work — and stronger inside Kimi Code. This plugin is a **thin ACP bridge**: tools, swarm, skills, and models stay with Kimi Code.
+Kimi K3 is strong at frontend and multimodal work — and stronger inside Kimi Code. Professional benchmarks confirm this: K3 was trained with preserved thinking history, and if a harness doesn't send earlier reasoning back correctly, performance becomes unstable — Moonshot officially recommends using a verified harness like Kimi Code to maintain quality ([source](https://www.nxcode.io/resources/news/kimi-k3-benchmarks-coding-agent-evaluation-guide-2026)). Hugging Face's quantized record also shows K3 evaluated with the Kimi Code harness scores only 73.7 when run with the Claude Code harness ([source](https://huggingface.co/unsloth/Kimi-K3-GGUF)). More importantly, switching harnesses directly changes both the score **and** the operational cost — in other words, keeping K3 in Kimi Code is both more accurate and cheaper. If you're used to your harness and find switching tools a hassle, this plugin lets you call Kimi Code as a subagent right inside Claude Code / Grok, while K3 keeps working in its most familiar Kimi Code environment.
+
+The plugin triggers Kimi automatically — the main agent MUST hand off to Kimi for any UI/interaction frontend work.
+You can also request it explicitly, e.g. "let Kimi handle this page."
+The auto-trigger rules live in the plugin (`agents/kimi-rescue.md` / `commands/rescue.md` descriptions); install it and you get default mandatory frontend/UI handoff out of the box. To tighten or loosen the trigger scope, add global instructions in `~/.claude/CLAUDE.md`, or adjust `AGENTS.md` per-repo.
+
+This plugin is a **thin ACP bridge**: tools, swarm, skills, and models stay with Kimi Code, giving K3 its most familiar environment.
 
 | | |
 | --- | --- |
-| **Version** | **0.2.0** |
+| **Version** | **0.2.1** |
 | **Hosts** | Claude Code, Grok |
 | **Node** | ≥ 18.18 |
 | **Needs** | Kimi Code CLI installed + `kimi login` |
@@ -26,6 +32,10 @@ Kimi k3 is strong at frontend and multimodal work — and stronger inside Kimi C
 | **When (required)** | Frontend/UI, style mocks/reference pages, CSS/layout, screenshot or **video** visual bugs, multi-file implement |
 
 **Must not** re-implement that work in the main agent when Kimi is ready. Return Kimi’s output as-is.
+
+> **Real run**: asked Kimi in Claude Code to redesign a LIMS frontend to a Linear-style light theme — Kimi independently completed all CSS/JS/HTML rewrites in 2m 55s.
+>
+> ![Claude Code calling Kimi to redesign a frontend](docs/assets/cc_test.png)
 
 Advanced commands (`/kimi:task`, background jobs, status/result): see [AGENTS.md](AGENTS.md).
 
@@ -100,9 +110,9 @@ Errors are prefixed with `[kimi-plugin]` and include a numbered **Fix** list —
 
 | Component | Requirement |
 | --- | --- |
-| This plugin | 0.2.0 |
+| This plugin | 0.2.1 |
 | Node | ≥ 18.18 |
-| Kimi Code | CLI with working `kimi acp` (NDJSON). Setup prints `compat` + kimi version. Upgrade Kimi Code if ACP fails. |
+| Kimi Code | ≥ 0.30.0 (CLI with working `kimi acp` NDJSON). Setup prints `compat` + kimi version. Upgrade Kimi Code if ACP fails. |
 
 ## Related
 

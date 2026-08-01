@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Claude Code / Grok plugins that run local Kimi Code as a coding subagent over ACP.",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "plugins": [
     {
       "name": "kimi",
       "description": "REQUIRED frontend/UI handoff to local Kimi Code via ACP; main agent must not implement UI when ready (happy path: /kimi:rescue).",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": {
         "name": "oppnc",
         "url": "https://github.com/oppnc"
