@@ -1,6 +1,6 @@
 {
   "name": "kimi-plugin-cc",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "description": "Claude Code / Grok plugin that runs local Kimi Code as a subagent over ACP.",

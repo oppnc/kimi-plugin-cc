@@ -1,7 +1,7 @@
 {
   "name": "kimi",
   "displayName": "Kimi Code",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "REQUIRED handoff for frontend/UI and multimodal work to local Kimi Code (ACP subagent). Main agent must not implement UI when Kimi is ready. Happy path: /kimi:rescue.",
   "author": {
     "name": "oppnc",

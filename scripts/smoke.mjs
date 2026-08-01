@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Release smoke for 0.2.0 — unit + live ACP (setup, yolo, plan, tools, media, sessions, resume).
+ * Release smoke for 0.2.1 — unit + live ACP (setup, yolo, plan, tools, media, sessions, resume).
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -177,4 +177,4 @@ mustOk(
 );
 
 fs.rmSync(tmp, { recursive: true, force: true });
-console.log("\nAll smoke checks passed (0.2.0).");
+console.log("\nAll smoke checks passed (0.2.1).");

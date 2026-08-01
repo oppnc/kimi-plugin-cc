@@ -2,7 +2,7 @@
 
 **Language / 语言:** [English](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
 
-## 0.2.1（开发中）
+## 0.2.1
 
 ### 修复
 - **取消竞态（POSIX）：** runner 收到 SIGTERM 时不再覆盖宿主已置为 `cancelled` 的 job——`failOrphan` 跳过已取消的 job。
@@ -22,6 +22,9 @@
 
 ### 新增
 - `tests/acp-client.test.mjs` + `tests/fixtures/fake-kimi-acp.mjs`（请求超时会话保留、可配置空 turn 重试预算）；`tests/companion-cli.test.mjs`（无需 Kimi 的 CLI 级契约：`--wait` 退出码、孤儿回收、取消竞态、resume 提示、未知 flag 拒绝）——并同步到 Codex 包。
+
+### 兼容性
+- 已对 **kimi-code 0.31.1** 做过测试；自 0.30.0 起 ACP 协议无变化。最低支持 **0.30.0**（见 README 兼容表）。
 
 ## 0.2.0
 
