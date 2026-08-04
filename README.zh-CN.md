@@ -42,13 +42,31 @@ Kimi 可用时，主 agent **不得**自己实现这些工作；结果按原文�
 
 ## 安装
 
-### 前置
+需要：**Node.js ≥ 18.18**、本机 **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** 并完成 `kimi login`。
 
-1. Node.js ≥ 18.18  
-2. [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) + `kimi login`  
-3. PATH 找不到 `kimi` 时（Windows 常见）：设置 `KIMI_CLI_PATH` 指向 `kimi` / `kimi.exe`（常见 `%USERPROFILE%\.kimi-code\bin\kimi.exe`）
+### 丢给 AI 安装
 
-### Claude Code
+把下面整段复制给 Claude Code / Grok 等，让它代你装：
+
+```text
+请从 https://github.com/oppnc/kimi-plugin-cc 安装 Kimi 插件
+
+1. 前置：Node.js ≥ 18.18，已安装 Kimi Code CLI 并完成 kimi login。
+2. Claude Code：
+   /plugin marketplace add oppnc/kimi-plugin-cc
+   /plugin install kimi@kimi-code-cc
+   然后 /kimi:setup（看不到命令时 /reload-plugins）
+3. Grok：
+   grok plugin install oppnc/kimi-plugin-cc#plugins/kimi --trust
+4. 用 /kimi:rescue（或 Grok 的 kimi:kimi-rescue）做一个极小前端任务冒烟。
+
+Windows：PATH 找不到 kimi 时，设置 KIMI_CLI_PATH 指向 kimi.exe 全路径
+（常见 %USERPROFILE%\.kimi-code\bin\kimi.exe）。
+```
+
+### 自己装
+
+**Claude Code**
 
 ```text
 /plugin marketplace add oppnc/kimi-plugin-cc
@@ -57,7 +75,7 @@ Kimi 可用时，主 agent **不得**自己实现这些工作；结果按原文�
 
 然后 `/kimi:setup`。当前会话看不到命令时：`/reload-plugins`。
 
-### Grok
+**Grok**
 
 ```bash
 grok plugin install oppnc/kimi-plugin-cc#plugins/kimi --trust

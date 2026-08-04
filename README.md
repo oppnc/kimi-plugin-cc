@@ -41,13 +41,31 @@ Advanced commands (`/kimi:task`, background jobs, status/result): see [AGENTS.md
 
 ## Install
 
-### Prerequisites
+Needs: **Node.js ≥ 18.18**, local **[Kimi Code](https://github.com/MoonshotAI/kimi-code)** + `kimi login`.
 
-1. Node.js ≥ 18.18  
-2. [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) + `kimi login`  
-3. If `kimi` is missing from PATH (common on Windows): set `KIMI_CLI_PATH` to the full path of `kimi` / `kimi.exe` (often `%USERPROFILE%\.kimi-code\bin\kimi.exe`)
+### Paste into your agent
 
-### Claude Code
+Copy the block below into Claude Code / Grok / any coding agent and let it install:
+
+```text
+Install the Kimi plugin from https://github.com/oppnc/kimi-plugin-cc
+
+1. Prerequisites: Node.js ≥ 18.18, Kimi Code CLI installed and `kimi login` done.
+2. Claude Code:
+   /plugin marketplace add oppnc/kimi-plugin-cc
+   /plugin install kimi@kimi-code-cc
+   then /kimi:setup (if commands missing: /reload-plugins)
+3. Grok:
+   grok plugin install oppnc/kimi-plugin-cc#plugins/kimi --trust
+4. Smoke-check with a small frontend task via /kimi:rescue (or Grok kimi:kimi-rescue).
+
+Windows: if `kimi` is missing from PATH, set KIMI_CLI_PATH to the full path of
+kimi.exe (often %USERPROFILE%\.kimi-code\bin\kimi.exe).
+```
+
+### Or install yourself
+
+**Claude Code**
 
 ```text
 /plugin marketplace add oppnc/kimi-plugin-cc
@@ -56,7 +74,7 @@ Advanced commands (`/kimi:task`, background jobs, status/result): see [AGENTS.md
 
 Then `/kimi:setup`. If commands are missing in the current session: `/reload-plugins`.
 
-### Grok
+**Grok**
 
 ```bash
 grok plugin install oppnc/kimi-plugin-cc#plugins/kimi --trust
